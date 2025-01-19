@@ -243,7 +243,7 @@ namespace ams::kern {
             region_layouts[num_regions++] = { .size = alias_region_size, .type = RegionType_Alias, .alloc_index = 0, };
             region_layouts[num_regions++] = { .size = heap_region_size,  .type = RegionType_Heap,  .alloc_index = 0, };
 
-            /* Selection-sort the regions by size largest-to-smallest. */
+            /* Bubble-sort the regions by size largest-to-smallest. */
             for (size_t i = 0; i < num_regions - 1; ++i) {
                 for (size_t j = i + 1; j < num_regions; ++j) {
                     if (region_layouts[i].size < region_layouts[j].size) {
@@ -263,6 +263,9 @@ namespace ams::kern {
 
                 /* Determine where the current region should go. */
                 cur_region.alloc_index = alloc_sizes[1] >= alloc_sizes[0] ? 1 : 0;
+				if (!m_enable_aslr) {
+					cur_region.alloc_index = 1; /*hardcode, everything load after module aka process_code */
+				}
                 ++alloc_counts[cur_region.alloc_index];
 
                 /* Check that the current region can fit. */
@@ -311,6 +314,7 @@ namespace ams::kern {
                             }
                         }
                     }
+					std::swap(region_layouts[0], region_layouts[3]); /*heap comes first*/
                 }
 
                 /* Determine aslr offsets for the current space. */
@@ -329,7 +333,13 @@ namespace ams::kern {
                             }
                         }
                     }
-                }
+					
+                } else {
+					for (size_t i = 0; i < cur_alloc_count; ++i) {
+                        aslr_offsets[i] = ((0xcafe00000 - GetInteger(alloc_starts[cur_alloc_index]))/ RegionAlignment) * RegionAlignment; /*write where heap should be here*/
+                    }
+
+				}
 
                 /* Calculate final region positions. */
                 KProcessAddress prev_region_end = alloc_starts[cur_alloc_index];
